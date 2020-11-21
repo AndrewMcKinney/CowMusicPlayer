@@ -4,6 +4,7 @@ from pydub import AudioSegment
 from pydub.playback import play
 import simpleaudio
 import time
+import msvcrt
 
 from pytube import YouTube
  # takes about 1 minute to download a 3 hr video
@@ -31,5 +32,21 @@ playing_song = simpleaudio.play_buffer (
     bytes_per_sample = sound.sample_width,
     sample_rate = sound.frame_rate
 )
-#time.sleep(10) pauses for 10 seconds, blocking
-time.sleep(100) #if execution end then song playing does as well
+startTime = time.time()
+#len(sound) returns milliseconds
+print("waiting for input")
+while time.time() - startTime < (len(sound) / 1000 ): 
+    #NOTE: user does not have to press enter for this to register a command
+    if msvcrt.kbhit(): #there is a key press waiting to be taken in
+        print("read loud and clear!")
+        s = input("enter your command (skip):")
+        if (s == "skip"):
+            break
+        elif (s == "print") :
+            print("time value: {0}".format(time.time() - startTime))
+            print("len value: {0}".format(len(sound) / 1000))
+        else:
+            print("invalid command")
+    time.sleep(1)
+
+#time.sleep(10) pauses for 10 seconds, blocking #if execution end then song playing does as well
