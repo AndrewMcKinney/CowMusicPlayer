@@ -150,10 +150,18 @@ def playMusicMenu():
         music_storage_json = json.load(music_storage)
     command = ""
     song_list = music_storage_json['songs']
+    last_song_played = -1
     while(command.lower() != "q"):
         #range is inclusive
-        random_song_index = random.randint(0, len(song_list) - 1)
+        random_song_index = 0
+        while (True):
+            random_song_index = random.randint(0, len(song_list) - 1)
+            #loop until last song is not equal to the current song
+            #also will pass if playlist has a length of 1 to avoid an infinite loop
+            if ( random_song_index != last_song_played or len(song_list) == 1 ):
+                break
         command = playSong(song_list[random_song_index])
+        last_song_played = random_song_index
 
 
     #here is where I would grab the right song IF I IMPLEMENTED IT
