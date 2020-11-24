@@ -77,7 +77,7 @@ while sound.isPlaying():
 
 def playSong(song_dict):
     song = CowSong(song_dict['song_path'], song_dict['song_name'])
-    command = None
+    command = ""
     song.play()
     print("Now playing {0}".format(song_dict['song_name']))
     while (song.isPlaying()): 
