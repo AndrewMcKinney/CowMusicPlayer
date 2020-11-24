@@ -9,19 +9,13 @@ from pytube import YouTube
 import json
 import random
  # takes about 1 minute to download a 3 hr video
-""" HERE BE OLD CODE
-hasFailedCount = 0
-yt = None
-while (hasFailedCount < 3):
-    try:
-        yt = YouTube('https://www.youtube.com/watch?v=2FiyAOa6Lk8') #this sometimes fails not sure why
-        break
-    except:
-        print("Youtube download failed, trying again. (Attempt:{0})".format(hasFailedCount + 1))
-        hasFailedCount += 1
-#print(pathlib.Path().absolute())
-"""
-#this sets up some constants
+
+#time converstion constants
+SECONDS_IN_MINUTE = 60
+MINUTES_IN_HOUR = 60
+MILLISECONDS_IN_SECOND = 1000
+
+#this sets up some directory constants
 ROOT = pathlib.Path().absolute()
 MUSIC_FOLDER_NAME = "music_files"
 MUSIC_STORAGE_JSON_PATH = ROOT / "music_storage.json"
@@ -38,42 +32,124 @@ if(not MUSIC_STORAGE_JSON_PATH.exists()):
     with open(MUSIC_STORAGE_JSON_PATH, 'w') as data_file:
         json.dump(json_storage, data_file, indent=4)
 
-""" HERE BE OLD CODE
-stream = yt.streams.filter(only_audio=True, file_extension='mp4').asc()[0]
-song_name = stream.default_filename[:-4]
-#will automatically skip existing files -- perhaps not, ill have to manually code that in
 
-stream.download(output_path = MUSIC_FOLDER_PATH, filename = song_name)
-#step 1: get the mp4 file
+def convertTimeToMilliseconds(time : str):
+    if(time.count(":") == 1):
+        time_split = time.split(":")
+        minutes = int(time_split[0])
+        seconds = (minutes * SECONDS_IN_MINUTE) + int(time_split[1])
+        milliseconds = seconds * MILLISECONDS_IN_SECOND
+        return milliseconds
+    elif(time.count(":" == 2)):
+        time_split = time.split(":")
+        hours = int(time_split[0])
+        minutes = (hours * MINUTES_IN_HOUR) + int(time_split[1])
+        seconds = (minutes * SECONDS_IN_MINUTE) + int(time_split[2])
+        milliseconds = seconds * MILLISECONDS_IN_SECOND
+        return milliseconds
 
-song_location_path = MUSIC_FOLDER_PATH / (song_name + '.mp4')
-sound = CowSong(song_location_path, song_name)
-sound.play()
-#default setup for songs:
-# dict = {
-#   song_name = XXXXXXX,
-#   song_path = XXXXXXXX,
-#   collections = []
-#   }
-#len(sound) returns milliseconds
-print("waiting for input")
-#time.time() - startTime < (len(sound) / 1000 )
-while sound.isPlaying(): 
-    #NOTE: user does not have to press enter for this to register a command
-    if msvcrt.kbhit(): #there is a key press waiting to be taken in
-        print("read loud and clear!")
-        s = input("enter your command (skip):")
-        if (s == "skip"):
+def parseTracks(file, storage_dict):
+    tracks = []
+    while(True):
+        line = file.readline()
+        unchanged_line = line
+        line = line.strip() #removes extra whitespace
+        print("currenlty reading ({0}) in parseTracks".format(line))
+        if(len(line) == 0 or line[0] == "#"):
+            continue
+        if(line == "end_tracks"):
             break
-        elif (s == "pause") :
-            sound.pause()
-            time.sleep(3)
-            sound.play()
-            #sound.stop()
-        else:
-            print("invalid command")
-    time.sleep(1)
-"""
+        
+        line = line.replace(" - ", "-") #Gladius - 4:35 -> Gladius-4:35
+        line = line.replace(" ", "-") # Gladius 4:35 -> Gladius-4:35
+
+        if(line.count("-") > 2 | line.count("-") < 1):
+            raise Exception("Error in Parse tracks on ({0}) converted to ({1}) ".format(unchanged_line, line))
+
+        line_split = line.split("-")
+        track_dict = {}
+        for i in range(0, len(line_split)):
+            #grab first character of ith string
+            if(line_split[i][0].isdigit()):
+                #this must be a time
+                timeMilliseconds = convertTimeToMilliseconds(line_split[i])
+                if("begin" in track_dict):
+                    track_dict['end'] = timeMilliseconds
+                else:
+                    track_dict['begin'] = timeMilliseconds
+            else:
+                #this is the name of the track
+                track_dict['name'] = line_split[i]
+        tracks.append(track_dict)
+    return tracks
+
+
+def parseImport(file):
+    line = ""
+    storage_dict = {}
+    while(True):
+        line = file.readline()
+        print("currenlty reading ({0}) in parseImport".format(line))
+        if(len(line) == 0 or line[0] == "#"):
+            continue
+
+        if(line.indexOf("=") != -1):
+            line_split = line.split('=')
+            command_name = line_split[0]
+            command_value = line_split[1]
+            if(command_name == "name"):
+                storage_dict['name'] = command_value
+                continue
+            if(command_name == 'link'):
+                storage_dict['link'] = command_value
+                break #link is going to be the last sent command
+            #this was an invalid command
+            raise Exception("Error in parseImport: {0} is an unknown command".format(command_name))
+
+        if(line == "tracks:"):
+            storage_dict['tracks'] = parseTracks(file, storage_dict)
+            continue
+        
+
+def parseImportFast(file):
+    while(True):
+        line = file.readline()
+        print("currenlty reading ({0}) in parseImportFast".format(line))
+        line = line.strip()
+        if(len(line) == 0 or line[0] == "#"):
+            continue
+        if(line == "end_import_fast"):
+            break
+        addMusicSingle(line)
+        time.sleep(0.1)
+
+            
+
+def parseMusicFile(fileName):
+    with open(ROOT / fileName) as file:
+        #0 is the offset, 2 means from EOF
+        file.seek(0,2)
+        EOF = file.tell()
+        file.seek(0,0)
+
+        while(True):
+            line = file.readline()
+            line = line.strip()
+            print("currenlty reading ({0}) in parseMusicFile".format(line))
+
+            if(file.tell() == EOF):
+                break
+
+            #empty lines and comments are skipped
+            if(len(line) == 0 or line[0] == "#"):
+                continue
+
+            if(line == "import:"):
+                parseImport(file)
+
+            if(line == "import_fast:"):
+                parseImportFast(file)
+            
 
 def playSong(song_dict):
     song = CowSong(song_dict['song_path'], song_dict['song_name'])
@@ -100,9 +176,26 @@ def playSong(song_dict):
         time.sleep(0.1)
     return command
 
-def addMusicSingle():
+def openMusicStorageJson():
+    with open(MUSIC_STORAGE_JSON_PATH, 'r') as music_storage:
+        return json.load(music_storage)
+
+def saveMusicStorageJson(new_json):
+    with open(MUSIC_STORAGE_JSON_PATH, 'w') as music_storage:
+        json.dump(new_json, music_storage, indent=4)
+
+#this is really inefficent, O(N) time, should be O(1) really
+def findSongPath(song_name):
+    music_json = openMusicStorageJson()
+    songs = music_json['songs']
+    for song in songs:
+        if (song['song_name'] == song_name):
+            return song['song_path']
+    return None
+
+
+def addMusicSingle(youtubeLink, selected_name = None):
     hasFailedCount = 0
-    youtubeLink = input("enter your youtube link: ")
     yt = None
     while (hasFailedCount < 3):
         try:
@@ -111,13 +204,27 @@ def addMusicSingle():
         except:
             print("Youtube download failed, trying again... (Attempt:{0})".format(hasFailedCount + 1))
             hasFailedCount += 1
-            time.sleep(3)
+            time.sleep(0.5)
     if( hasFailedCount >= 3):
         raise Exception("Youtube download failed with link: {0}".format(youtubeLink))
+
+
+
+
     #select the right stream
     stream = yt.streams.filter(only_audio=True, file_extension='mp4').asc()[0]
     #cuts off the .mp4 (windows will add this back anyway)
-    song_name = stream.default_filename[:-4] 
+    song_name = None
+    if(selected_name != None):
+        song_name = selected_name
+    else:
+        song_name = stream.default_filename[:-4] 
+    
+    #check for duplicates
+    if (findSongPath(song_name) != None):
+        print("Skipping Duplicate {0}".format(song_name))
+        return
+
     #download the mp4 file
     stream.download(output_path = MUSIC_FOLDER_PATH, filename = song_name)
     song_location_path = MUSIC_FOLDER_PATH / (song_name + '.mp4')
@@ -127,19 +234,14 @@ def addMusicSingle():
     song_dict['song_path'] = str(song_location_path)
     song_dict['collecitons'] = []
 
-    music_storage_json = None
-    with open(MUSIC_STORAGE_JSON_PATH, 'r') as music_storage:
-        music_storage_json = json.load(music_storage)
+    music_storage_json = openMusicStorageJson()
 
     music_storage_json['songs'].append(song_dict)
+    music_storage_json['numberOfSongs'] += 1
 
-    #dumps from music_storage_json into music storage
-    with open(MUSIC_STORAGE_JSON_PATH, 'w') as music_storage:
-        json.dump(music_storage_json, music_storage, indent=4)
+    saveMusicStorageJson(music_storage_json)
 
     print(song_name + " successfully added!")
-
-
 
 def playMusicMenu():
     print("which music list would you like to play?")
@@ -175,10 +277,12 @@ def addMusicMenu():
         if(selection.lower() == "y"):
             another = 'y'
             while(another.lower() == 'y'):
-                addMusicSingle()
+                addMusicSingle(input("enter your youtube link: "))
                 another = input("Add another? (Y)es/ anything else quits")
+        
         elif(selection.lower() == "f"):
-            print("downloading from a file is not implemented yet!")
+            print("Downloading from a file is now Supported!!!!!")
+            parseMusicFile(input("which file do you want to import from?"))
         elif(selection.lower() == "q"):
             print("Exiting to menu...")
         else:
