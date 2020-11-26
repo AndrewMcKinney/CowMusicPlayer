@@ -1,3 +1,5 @@
 /music_files/
-/cow_music/__pychache__/*
+/cow_music/__pycache__/
 music_storage.json
+import_music.txt
+oldcode.txt
