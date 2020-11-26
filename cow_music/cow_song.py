@@ -14,6 +14,7 @@ class CowSong():
         self._wasPaused = False
         self._timeElapsed = 0
 
+
     def play(self):
         seg = self.audioSegment
         if(self._wasPaused):

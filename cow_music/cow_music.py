@@ -110,7 +110,7 @@ def addMusicTracks(storage_dict):
     tracks = storage_dict['tracks']
     allDuplicates = True
     for track in tracks:
-        if(findSongPath(song_name + track['name']) == None):
+        if(findSongIndex(song_name + track['name']) == None):
             allDuplicates = False
             break
     if(allDuplicates):
@@ -141,8 +141,8 @@ def addMusicTracks(storage_dict):
         track_location_path = MUSIC_FOLDER_PATH / (song_name + track['name'] + ".mp4")
         audioSeg.export( track_location_path, format = "mp4")
         song_dict = {}
-        song_dict['song_name'] = song_name + track['name']
-        song_dict['song_path'] = str(track_location_path)
+        song_dict['name'] = song_name + track['name']
+        song_dict['path'] = str(track_location_path)
         song_dict['collecitons'] = []
         song_dict['youtube_link'] = youtubeLink
 
@@ -228,24 +228,122 @@ def parseMusicFile(fileName):
 
             if(line == "import_fast:"):
                 parseImportFast(file)
+
+def deleteSong(song_name : str):
+    print("you want to delete {0}".format(song_name))
+    command = input("enter (confirm) to confirm")
+    if(command == 'confirm'):
+        print('deleting {0}'.format(song_name))
+        songIndex = findSongIndex(song_name)
+        if(songIndex == None):
+            print("Error in deleteSong: {0} does not exist".format(song_name))
+        music_json = openMusicStorageJson()
+        songs = music_json['songs']
+        os.remove(songs[songIndex]['path'])
+        songs.pop(songIndex)
+        music_json['songs'] = songs
+        saveMusicStorageJson(music_json)
+        print('{0} deleted'.format(song_name))
+    else:
+        print('deletion aborted')
+
+
+def quickPlay(seg : AudioSegment, length_to_play : int):
+        playingSong = simpleaudio.play_buffer ( 
+            seg.raw_data,
+            num_channels =seg.channels,
+            bytes_per_sample = seg.sample_width,
+            sample_rate = seg.frame_rate
+        )
+        time.sleep(length_to_play)
+        playingSong.stop()
+        
+
+def editSong(song_name:str):
+    songIndex = findSongIndex(song_name)
+    music_json = openMusicStorageJson()
+    path = music_json['songs'][songIndex]['path']
+    if (songIndex == None):
+        print("Error: editSong passed invalid song name")
+        return
+    while(True):
+        command = input("trim the (B)egining or (E)nd? Or (Q)uit back to previous menu")
+        if(command.lower() == 'q'):
+            break
+        if(command.lower() == 'b'):
+            originalSong = AudioSegment.from_file(path)
+            while(True):
+                #entering 0 here will result in a crash
+                command = input("Enter how many Milliseconds to trim from the begining")
+                trimmedSong = originalSong[int(command):]
+                print("does this sound right?")
+                time.sleep(1)
+
+                quickPlay(trimmedSong, 3)
+                command = input("Sounded acceptable, (Y)es or (N)o?")
+                if(command.lower() == "y"):
+                    os.remove(path)
+                    trimmedSong.export( path, format = "mp4")
+                    break
+        if(command.lower() == 'e'):
+            originalSong = AudioSegment.from_file(path)
+            while(True):
+                #entering 0 here will result in a crash
+                command = input("Enter how many Milliseconds to trim from the end")
+                trimmedSong = originalSong[:-int(command)]
+                print("does this sound right?")
+                time.sleep(1)
+
+                sample_to_play = trimmedSong[-4000:]
+                quickPlay(sample_to_play, 3)
+                command = input("Sounded acceptable, (Y)es or (N)o?")
+                if(command.lower() == "y"):
+                    os.remove(path)
+                    trimmedSong.export(path, format = "mp4")
+                    break
+
+
             
 
-def playSong(song_dict):
-    song = CowSong(song_dict['song_path'], song_dict['song_name'])
+
+
+
+def pauseMenu(current_song, previous_song): 
+    while(True):
+        print("Paused, options: (E)dit current or previous song, (D)elete current or previous song")
+        command = input("Enter (P) to continue (P)laying")
+        if(command.lower() == 'p'):
+            break
+        if(command.lower() == 'd'):
+            command = input("Delete (C)urrent or (P)revious song?")
+            if(command.lower() == 'c'):
+                deleteSong(current_song['name'])
+            elif(command.lower() == 'p'):
+                deleteSong(previous_song['name'])
+        if(command.lower() == 'e'):
+            command = input("Edit (C)urrent or (P)revious song?")
+            if(command.lower() == 'c'):
+                editSong(current_song['name'])
+            elif(command.lower() == 'p'):
+                editSong(previous_song['name'])
+        
+
+def playSong(song_dict, previous_song = None):
+    song = CowSong(song_dict['path'], song_dict['name'])
     command = ""
     song.play()
-    print("Now playing {0}".format(song_dict['song_name']))
+    print("Now playing {0}".format(song_dict['name']))
     while (song.isPlaying()): 
         #NOTE: user does not have to press enter for this to register a command
         if msvcrt.kbhit(): #there is a key press waiting to be taken in
             print("read loud and clear!")
-            command = input("enter your command ((S)kip, (P)ause), ((Q)uit):")
+            command = input("enter your command ((S)kip, (P)ause menu, (Q)uit):")
             if (command.lower() == "s"):
                 song.stop()
                 break
             elif (command.lower() == "p") :
                 song.pause()
-                input("waiting for any input to continue")
+                pauseMenu(song_dict, previous_song)
                 song.play()
             elif (command.lower() == "q"):
                 song.stop()
@@ -264,12 +362,13 @@ def saveMusicStorageJson(new_json):
         json.dump(new_json, music_storage, indent=4)
 
 #this is really inefficent, O(N) time, should be O(1) really
-def findSongPath(song_name):
+def findSongIndex(song_name):
     music_json = openMusicStorageJson()
     songs = music_json['songs']
-    for song in songs:
-        if (song['song_name'] == song_name):
-            return song['song_path']
+    for x in range(0, len(songs)):
+        song = songs[x]
+        if (song['name'] == song_name):
+            return x
     return None
 
 
@@ -297,7 +396,7 @@ def addMusicSingle(youtubeLink, selected_name = None):
         song_name = stream.default_filename[:-4] 
     
     #check for duplicates
-    if (findSongPath(song_name) != None):
+    if (findSongIndex(song_name) != None):
         print("Skipping Duplicate {0}".format(song_name))
         return
     print("Downloading {0}...".format(song_name))
@@ -306,8 +405,8 @@ def addMusicSingle(youtubeLink, selected_name = None):
     song_location_path = MUSIC_FOLDER_PATH / (song_name + '.mp4')
     #prepare the song entry for json storage
     song_dict = {}
-    song_dict['song_name'] = song_name
-    song_dict['song_path'] = str(song_location_path)
+    song_dict['name'] = song_name
+    song_dict['path'] = str(song_location_path)
     song_dict['collecitons'] = []
     song_dict['youtube_link'] = youtubeLink
 
@@ -324,13 +423,15 @@ def playMusicMenu():
     print("which music list would you like to play?")
     print("HAHA, none are implemented of course, so you just have to deal with the default")
 
-    music_storage_json = None
-    with open(MUSIC_STORAGE_JSON_PATH, 'r') as music_storage:
-        music_storage_json = json.load(music_storage)
+    music_storage_json = openMusicStorageJson()
     command = ""
-    song_list = music_storage_json['songs']
+    
     last_song_played = -1
     while(command.lower() != "q"):
+        #the user can delete songs while in pause menu, so this has to be reloaded everytime
+        #CONERN: PERFORMANCE
+        music_storage_json = openMusicStorageJson()
+        song_list = music_storage_json['songs']
         #range is inclusive
         random_song_index = 0
         while (True):
@@ -339,7 +440,10 @@ def playMusicMenu():
             #also will pass if playlist has a length of 1 to avoid an infinite loop
             if ( random_song_index != last_song_played or len(song_list) == 1 ):
                 break
-        command = playSong(song_list[random_song_index])
+        if(last_song_played == -1):
+            command = playSong(song_list[random_song_index])
+        else:
+            command = playSong(song_list[random_song_index], song_list[last_song_played])
         last_song_played = random_song_index
 
 
@@ -365,12 +469,25 @@ def addMusicMenu():
         else:
             print("Invalid command")
 
+def testing():
+    music_json = openMusicStorageJson()
+    songs = music_json['songs']
+    #this is "i was the sun"
+    song = songs[0]
+    command = input("Enter how many Milliseconds to trim from the end")
+    seg = AudioSegment.from_file(song['path'])
+    seg_test = seg[:-int(command)] #should remove the last 10 seconds
+    quickPlay(seg_test[-10000:], 10)
+
 def mainMenu():
     selection = "Null"
     print("Hello, welcome to the Cow Audio Player main menu")
     while( selection.lower() != "q"):
         print("Options: (A)dd music, (P)lay music, (E)dit music, (Q)uit")
         selection = input("What would you like to do?")
+        if(selection.lower() == "t"):
+            testing()
+            return
         if(selection.lower() == "a"):
             print("add music selected")
             addMusicMenu()
