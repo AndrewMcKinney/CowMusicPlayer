@@ -20,6 +20,7 @@ ROOT = pathlib.Path().absolute()
 MUSIC_FOLDER_NAME = "music_files"
 MUSIC_STORAGE_JSON_PATH = ROOT / "music_storage.json"
 MUSIC_FOLDER_PATH = ROOT / MUSIC_FOLDER_NAME
+TEMP_FOLDER_PATH = ROOT / "temp"
 #check to see if the music folder exists if not, then create it
 if(not MUSIC_FOLDER_PATH.exists()):
     MUSIC_FOLDER_PATH.mkdir()
@@ -40,7 +41,7 @@ def convertTimeToMilliseconds(time : str):
         seconds = (minutes * SECONDS_IN_MINUTE) + int(time_split[1])
         milliseconds = seconds * MILLISECONDS_IN_SECOND
         return milliseconds
-    elif(time.count(":" == 2)):
+    elif(time.count(":") == 2):
         time_split = time.split(":")
         hours = int(time_split[0])
         minutes = (hours * MINUTES_IN_HOUR) + int(time_split[1])
@@ -54,14 +55,12 @@ def parseTracks(file, storage_dict):
         line = file.readline()
         unchanged_line = line
         line = line.strip() #removes extra whitespace
-        print("currenlty reading ({0}) in parseTracks".format(line))
         if(len(line) == 0 or line[0] == "#"):
             continue
         if(line == "end_tracks"):
             break
         
         line = line.replace(" - ", "-") #Gladius - 4:35 -> Gladius-4:35
-        line = line.replace(" ", "-") # Gladius 4:35 -> Gladius-4:35
 
         if(line.count("-") > 2 | line.count("-") < 1):
             raise Exception("Error in Parse tracks on ({0}) converted to ({1}) ".format(unchanged_line, line))
@@ -83,17 +82,90 @@ def parseTracks(file, storage_dict):
         tracks.append(track_dict)
     return tracks
 
+def addMusicTracks(storage_dict):
+    hasFailedCount = 0
+    yt = None
+    youtubeLink = storage_dict['link']
+    while (hasFailedCount < 3):
+        try:
+            yt = YouTube(youtubeLink) #this sometimes fails not sure why
+            break
+        except:
+            print("Youtube download failed, trying again... (Attempt:{0})".format(hasFailedCount + 1))
+            hasFailedCount += 1
+            time.sleep(0.5)
+    if( hasFailedCount >= 3):
+        raise Exception("Youtube download failed with link: {0}".format(youtubeLink))
+
+    #select the right stream
+    stream = yt.streams.filter(only_audio=True, file_extension='mp4').asc()[0]
+    #cuts off the .mp4 (windows will add this back anyway)
+    song_name = None
+    if('name' in storage_dict):
+        song_name = storage_dict['name']
+    else:
+        song_name = stream.default_filename[:-4] + " - " 
+    
+    #check for duplicates
+    tracks = storage_dict['tracks']
+    allDuplicates = True
+    for track in tracks:
+        if(findSongPath(song_name + track['name']) == None):
+            allDuplicates = False
+            break
+    if(allDuplicates):
+        print("Skipping {0} since it only contains duplicate tracks".format(song_name))
+    print("adding all tracks from {0}".format(song_name))
+
+    #download the mp4 file
+    print("Downloading {0}, this a few minutes".format(song_name))
+    stream.download(output_path = TEMP_FOLDER_PATH, filename = song_name)
+    stream_location_path = TEMP_FOLDER_PATH / (song_name + '.mp4')
+    fullAudio = AudioSegment.from_file(stream_location_path)
+
+    music_storage_json = openMusicStorageJson()
+
+    for i in range(0, len(tracks)):
+        track = tracks[i]
+        audioSeg = None
+        if('end' in track):
+            audioSeg = fullAudio[track['begin']: track['end']]
+        else:
+            #if this is not the last song
+            if(i + 1 != len(tracks)):
+                #the end of this song is the beginning of the next one
+                audioSeg = fullAudio[track['begin'] : tracks[i + 1]['begin']]
+            else:
+                #This is the last song, so grab the audio until the end
+                audioSeg = fullAudio[track['begin'] : ]
+        track_location_path = MUSIC_FOLDER_PATH / (song_name + track['name'] + ".mp4")
+        audioSeg.export( track_location_path, format = "mp4")
+        song_dict = {}
+        song_dict['song_name'] = song_name + track['name']
+        song_dict['song_path'] = str(track_location_path)
+        song_dict['collecitons'] = []
+        song_dict['youtube_link'] = youtubeLink
+
+        music_storage_json['songs'].append(song_dict)
+        music_storage_json['numberOfSongs'] += 1
+
+        print("added {0}".format(song_name + track['name']))
+
+    saveMusicStorageJson(music_storage_json)
+
+    print("all tracks from {0} successfully added".format(song_name))
+    os.remove(stream_location_path)
 
 def parseImport(file):
     line = ""
     storage_dict = {}
     while(True):
         line = file.readline()
-        print("currenlty reading ({0}) in parseImport".format(line))
+        line = line.strip()
         if(len(line) == 0 or line[0] == "#"):
             continue
 
-        if(line.indexOf("=") != -1):
+        if(line.find("=") >= 0 ):
             line_split = line.split('=')
             command_name = line_split[0]
             command_value = line_split[1]
@@ -109,12 +181,20 @@ def parseImport(file):
         if(line == "tracks:"):
             storage_dict['tracks'] = parseTracks(file, storage_dict)
             continue
+    if(not ('tracks' in storage_dict)):
+        if('name' in storage_dict):
+            addMusicSingle(storage_dict['link'], storage_dict['name'])
+        else:
+            addMusicSingle(storage_dict['link'])
+    else:
+        #This youtube video has tracks
+        addMusicTracks(storage_dict)
+
         
 
 def parseImportFast(file):
     while(True):
         line = file.readline()
-        print("currenlty reading ({0}) in parseImportFast".format(line))
         line = line.strip()
         if(len(line) == 0 or line[0] == "#"):
             continue
@@ -135,7 +215,6 @@ def parseMusicFile(fileName):
         while(True):
             line = file.readline()
             line = line.strip()
-            print("currenlty reading ({0}) in parseMusicFile".format(line))
 
             if(file.tell() == EOF):
                 break
@@ -208,9 +287,6 @@ def addMusicSingle(youtubeLink, selected_name = None):
     if( hasFailedCount >= 3):
         raise Exception("Youtube download failed with link: {0}".format(youtubeLink))
 
-
-
-
     #select the right stream
     stream = yt.streams.filter(only_audio=True, file_extension='mp4').asc()[0]
     #cuts off the .mp4 (windows will add this back anyway)
@@ -224,7 +300,7 @@ def addMusicSingle(youtubeLink, selected_name = None):
     if (findSongPath(song_name) != None):
         print("Skipping Duplicate {0}".format(song_name))
         return
-
+    print("Downloading {0}...".format(song_name))
     #download the mp4 file
     stream.download(output_path = MUSIC_FOLDER_PATH, filename = song_name)
     song_location_path = MUSIC_FOLDER_PATH / (song_name + '.mp4')
@@ -233,6 +309,7 @@ def addMusicSingle(youtubeLink, selected_name = None):
     song_dict['song_name'] = song_name
     song_dict['song_path'] = str(song_location_path)
     song_dict['collecitons'] = []
+    song_dict['youtube_link'] = youtubeLink
 
     music_storage_json = openMusicStorageJson()
 

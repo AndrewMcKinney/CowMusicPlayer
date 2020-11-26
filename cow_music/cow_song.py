@@ -17,6 +17,7 @@ class CowSong():
     def play(self):
         seg = self.audioSegment
         if(self._wasPaused):
+            #grabs the rest of the song, skipping timeElapsed seconds
             seg = self.audioSegment[(self._timeElapsed * 1000):] #need to convert to milliseconds
             print("timeElapsed: {0}".format(self._timeElapsed))
         #so depending on how long this takes to go, song will either end too soon or too late
