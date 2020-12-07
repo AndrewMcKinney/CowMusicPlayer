@@ -232,8 +232,7 @@ def parseImportFast(file):
         if(line == "end_import_fast"):
             break
         addMusicSingle(line)
-        #TODO: why is this here?, test removing
-        time.sleep(0.1)
+
 
 #main driver function of parsing import files
 def parseMusicFile(fileName):
