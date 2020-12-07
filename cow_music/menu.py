@@ -142,9 +142,9 @@ def pauseMenu(current_song, previous_song):
         if(command.lower() == 'e'):
             command = input("Edit (C)urrent or (P)revious song?")
             if(command.lower() == 'c'):
-                cow_music.editSong(current_song['name'])
+                editSong(current_song['name'])
             elif(command.lower() == 'p'):
-                cow_music.editSong(previous_song['name'])
+                editSong(previous_song['name'])
 
 def editSong(song_name:str):
     songIndex = cow_music.findSongIndex(song_name)
