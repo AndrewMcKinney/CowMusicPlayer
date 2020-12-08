@@ -11,6 +11,7 @@ import constants
 import menu
 import json
 import random
+
 # takes about 1 minute to download a 3 hr video
 #converts time in the format HH:MM:SS or MM:SS to milliseconds
 def convertTimeToMilliseconds(time : str):
@@ -108,6 +109,7 @@ def addMusicTracks(storage_dict):
             #this connection can fail on occasion
             yt = YouTube(youtubeLink) 
             break
+
         except:
             print("Youtube download failed, trying again... (Attempt:{0})".format(hasFailedCount + 1))
             hasFailedCount += 1
@@ -140,6 +142,7 @@ def addMusicTracks(storage_dict):
 
     #download the mp4 file
     print("Downloading {0}, this a few minutes".format(song_name))
+
     stream.download(output_path = constants.TEMP_FOLDER_PATH, filename = song_name)
     stream_location_path = constants.TEMP_FOLDER_PATH / (song_name + '.mp4')
     fullAudio = AudioSegment.from_file(stream_location_path)
@@ -175,6 +178,7 @@ def addMusicTracks(storage_dict):
 
         music_storage_json['songs'].append(song_dict)
         music_storage_json['numberOfSongs'] += 1
+
 
         print("added {0}".format(song_name + track['name']))
 
@@ -343,7 +347,6 @@ def addMusicSingle(youtubeLink, selected_name = None):
     saveMusicStorageJson(music_storage_json)
 
     print(song_name + " successfully added!")
-
     #here is where I would grab the right song IF I IMPLEMENTED IT
     #need me some JSON setup
 
