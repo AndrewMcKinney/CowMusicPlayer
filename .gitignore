@@ -2,4 +2,5 @@
 /cow_music/__pycache__/
 music_storage.json
 import_music.txt
+import_test.txt
 oldcode.txt
