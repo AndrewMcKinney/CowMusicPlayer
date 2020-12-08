@@ -1,0 +1,33 @@
+
+import_fast:
+#Dovakinn
+https://youtu.be/UsnRQJxanVM
+
+#meglobox main theme
+https://youtu.be/YOmAVOGW5Ak
+
+#last Stand Remix FTL
+https://youtu.be/PeYJrOEnnF8
+
+#song for denise orchestral
+https://youtu.be/scqEMVtIm_k
+
+end_import_fast
+
+import:
+#comments can also be added here
+name=Domina - 
+tracks:
+#comments can be added here as well
+00:00:00 - Gladius
+00:05:31 - Little Aliens
+00:08:24 - Mire
+00:11:01 - Ruiner
+00:14:52 - Domina
+#just make sure comments are on their own line
+00:17:42 - Crixus
+00:20:27 - Boom (Jason) (Or Walking out of hell one step at a time)
+00:23:27 - Spartacus
+00:26:45 - Afraid - 29:23
+end_tracks
+link=https://youtu.be/JPtSNYSqwMQ
