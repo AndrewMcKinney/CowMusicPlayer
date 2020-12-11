@@ -2,12 +2,15 @@
 Music player specialized in downloading and playing music from youtube.
 
 
-#### dependencies
+#### Installation
 install ffmpeg:
 ffmpeg - https://ffmpeg.org/download.html#build-windows
 
 All modules listed in /py_requirements.txt, which can be installed with "make install"
 
+NOTE: if you get an error similar to "get_ytplayer_config: could not find match for config_patterns" Then you need to run
+python -m pip install git+https://github.com/nficano/pytube
+The above line will install a more recent version of pytube where this error is fixed
 
 
 ## Usage
