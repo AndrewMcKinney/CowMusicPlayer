@@ -6,6 +6,7 @@ import time
 import msvcrt
 from cow_song import CowSong
 from pytube import YouTube
+import pytube
 from pydub import silence
 import constants
 import menu
@@ -109,9 +110,9 @@ def addMusicTracks(storage_dict):
             #this connection can fail on occasion
             yt = YouTube(youtubeLink) 
             break
-
-        except:
+        except Exception as e:
             print("Youtube download failed, trying again... (Attempt:{0})".format(hasFailedCount + 1))
+            print("Reported Error: {0}".format(e))
             hasFailedCount += 1
             time.sleep(0.5)
     if( hasFailedCount >= 3):
@@ -305,8 +306,9 @@ def addMusicSingle(youtubeLink, selected_name = None):
         try:
             yt = YouTube(youtubeLink) #this sometimes fails not sure why
             break
-        except:
+        except Exception as e:
             print("Youtube download failed, trying again... (Attempt:{0})".format(hasFailedCount + 1))
+            print("Reported Error: {0}".format(e))
             hasFailedCount += 1
             time.sleep(0.5)
     if( hasFailedCount >= 3):
@@ -352,6 +354,6 @@ def addMusicSingle(youtubeLink, selected_name = None):
 
 #a testing function that can be called, not reccomented for actual use
 def testing():
-    pass
+    print(pytube.__version__)
 
 
