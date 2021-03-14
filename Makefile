@@ -10,3 +10,4 @@ install:
 clean:
 	del /f music_storage.json
 	RD /S /Q "music_files"
+	RD /S /Q "temp"

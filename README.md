@@ -15,6 +15,8 @@ The above line will install a more recent version of pytube where this error is 
 
 ## Usage
 CowMusicPlayer uses a command line interface. Upon launching the app with 'make start', you will be given 4 options
+YOU HAVE TO RUN COW MUSIC PLAYER WITH ADMIN RIGHTS WHEN DOWNLOADING MUSIC
+
 
 (A)dd music:
     can add music by youtube link or with an import file
